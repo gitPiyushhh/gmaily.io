@@ -1,0 +1,62 @@
+async function replyToEmail(messageId) {
+    try {
+      // Check if the email has already been replied to
+      if (repliedEmails.has(messageId)) {
+        console.log(`Email with ID ${messageId} has already been replied to.`);
+        return;
+      }
+
+      // 1. Get the details of the original email
+      const originalMessage = await gmail.users.messages.get({
+        userId: "me",
+        id: messageId,
+      });
+
+      // 2. Extract the recipient address from the original email
+      const toAddress = originalMessage.data.payload.headers.find(
+        (header) => header.name === "To"
+      )?.value;
+
+      if (!toAddress) {
+        console.error(`Recipient address not found in the original message.`);
+        return;
+      }
+
+      // 3. Customize your auto-reply message here
+      const autoReplyMessage =
+        "Greetings from gmaily created with ❤️ by Piyush, see my other works: https://piyushsultaniya.netlify.app";
+
+      // 4. Create the reply message
+      const replyMessage = `To: ${toAddress}\r\nSubject: Re: ${
+        originalMessage.data.payload.headers.find(
+          (header) => header.name === "Subject"
+        )?.value
+      }\r\n\r\n${autoReplyMessage}`;
+
+      // 5. Send the reply
+      await gmail.users.messages.send({
+        userId: "me",
+        requestBody: {
+          raw: Buffer.from(replyMessage).toString("base64"),
+          threadId: messageId,
+        },
+      });
+
+      // 6. Label the email as "gmailyReplied"
+      await gmail.users.messages.modify({
+        userId: "me",
+        id: messageId,
+        requestBody: {
+          addLabelIds: ["gmailyReplied"],
+        },
+      });
+
+      // After successfully sending a reply, add the email ID to the set
+      repliedEmails.add(messageId);
+
+      console.log(`Replied to email with ID: ${messageId}`);
+    } catch (error) {
+      console.error("Error replying to email:", error);
+      throw error;
+    }
+  }
