@@ -153,13 +153,13 @@ async function startApp(auth) {
         id: messageId,
       });
 
-      // 2. Extract the recipient address from the original email
-      const toAddress = originalMessage.data.payload.headers.find(
-        (header) => header.name === "To"
+      // 2. Extract the sender's address from the original email
+      const fromAddress = originalMessage.data.payload.headers.find(
+        (header) => header.name === "From"
       )?.value;
 
-      if (!toAddress) {
-        console.error(`Recipient address not found in the original message.`);
+      if (!fromAddress) {
+        console.error(`Sender address not found in the original message.`);
         return;
       }
 
@@ -168,7 +168,7 @@ async function startApp(auth) {
         "Greetings from gmaily created with ❤️ by Piyush, see my other works: https://piyushsultaniya.netlify.app";
 
       // 4. Create the reply message
-      const replyMessage = `To: ${toAddress}\r\nSubject: Re: ${
+      const replyMessage = `To: ${fromAddress}\r\nSubject: Re: ${
         originalMessage.data.payload.headers.find(
           (header) => header.name === "Subject"
         )?.value
@@ -183,12 +183,42 @@ async function startApp(auth) {
         },
       });
 
-      // 6. Label the email as "gmailyReplied"
+      // 6. Create the label "gmailyReplied" if it doesn't exist
+      const labelName = "gmailyReplied";
+      const labels = await gmail.users.labels.list({ userId: "me" });
+      const labelExists = labels.data.labels.some(
+        (label) => label.name === labelName
+      );
+
+      if (!labelExists) {
+        const createdLabel = await gmail.users.labels.create({
+          userId: "me",
+          requestBody: {
+            name: labelName,
+            labelListVisibility: "labelShow",
+            messageListVisibility: "show",
+          },
+        });
+
+        console.log(`Label created: ${createdLabel.data.name}`);
+      }
+
+      // 7. Get the label ID for "gmailyReplied"
+      const label = labels.data.labels.find(
+        (label) => label.name === labelName
+      );
+
+      if (!label) {
+        console.error(`Label "${labelName}" not found.`);
+        return;
+      }
+
+      // 8. Label the email as "gmailyReplied"
       await gmail.users.messages.modify({
         userId: "me",
         id: messageId,
         requestBody: {
-          addLabelIds: ["gmailyReplied"],
+          addLabelIds: [label.id],
         },
       });
 
@@ -231,7 +261,7 @@ async function main(auth) {
 /*
   Starting server
 */
-const PORT = 3000;
+const PORT = 8000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
